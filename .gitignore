@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+
+# API credentials
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Testing
+.pytest_cache/
+
+# Linting
+.ruff_cache/
+
+# Generated reports
+outputs/*
+!outputs/.gitkeep
