@@ -1,23 +1,31 @@
+
 # Virtual environment
 .venv/
-
-# API credentials
-.env
+venv/
 
 # Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Testing
+# Testing cache
 .pytest_cache/
 
-# Linting
+# Ruff cache
 .ruff_cache/
 
-# Generated reports
-outputs/*
-!outputs/.gitkeep
+# Environment variables and secrets
+.env
 
 # Logs
 logs/
 *.log
+
+# Generated output
+outputs/
+
+# IDE
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
