@@ -16,9 +16,48 @@ def extract_response_text(response) -> str:
     return response.text
 
 
+def extract_finish_reason(response) -> str | None:
+    """
+    Extract and normalize the model's generation finish reason.
+    """
+
+    if not response or not response.candidates:
+        return None
+
+    finish_reason = response.candidates[0].finish_reason
+
+    if finish_reason is None:
+        return None
+
+    # Enum values may expose their name directly.
+    if hasattr(finish_reason, "name"):
+        return finish_reason.name
+
+    return str(finish_reason).split(".")[-1]
+
+
+def is_response_complete(response) -> bool:
+    """
+    Check whether Gemini completed generation normally.
+
+    STOP means normal completion.
+    Other reasons should not be treated as confirmed completion.
+    """
+
+    return extract_finish_reason(response) == "STOP"
+
+
+def is_response_truncated(response) -> bool:
+    """
+    Detect whether the output was cut off by the token limit.
+    """
+
+    return extract_finish_reason(response) == "MAX_TOKENS"
+
+
 def extract_response_metadata(response) -> dict:
     """
-    Extract useful metadata from a Gemini response.
+    Extract token usage and generation completion metadata.
     """
 
     metadata = {
@@ -26,16 +65,22 @@ def extract_response_metadata(response) -> dict:
         "finish_reason": None,
         "prompt_tokens": None,
         "response_tokens": None,
-        "total_tokens": None
+        "total_tokens": None,
+        "is_complete": False,
+        "was_truncated": False,
     }
+
+    if not response:
+        return metadata
 
     if response.candidates:
         metadata["candidate_count"] = len(response.candidates)
 
-        candidate = response.candidates[0]
+        metadata["finish_reason"] = extract_finish_reason(response)
 
-        if candidate.finish_reason:
-            metadata["finish_reason"] = str(candidate.finish_reason)
+        metadata["is_complete"] = is_response_complete(response)
+
+        metadata["was_truncated"] = is_response_truncated(response)
 
     usage = response.usage_metadata
 
