@@ -8,7 +8,11 @@ class APIAuthenticationError(TracePilotAPIError):
 
 
 class APIRateLimitError(TracePilotAPIError):
-    """API quota or rate limit exceeded."""
+    """Temporary API request rate limit exceeded."""
+
+
+class APIQuotaExceededError(TracePilotAPIError):
+    """Model-specific daily or allocated quota exhausted."""
 
 
 class APIResourceNotFoundError(TracePilotAPIError):
@@ -22,3 +26,6 @@ class APIServiceError(TracePilotAPIError):
 class APIRequestError(TracePilotAPIError):
     """Invalid API request."""
 
+
+class APIResponseTruncatedError(TracePilotAPIError):
+    """The model stopped because it reached the output token limit."""
