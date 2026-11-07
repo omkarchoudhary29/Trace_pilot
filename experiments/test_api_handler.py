@@ -1,22 +1,19 @@
 
 from app.llm.api_handler import generate_response
 
-prompt = """
-Explain this Python error in simple terms:
 
-ModuleNotFoundError: No module named 'pandas'
-"""
+def main():
+    prompt = """
+    Explain this Python error:
 
-system_instruction = """
-You are a helpful Python debugging assistant.
-Explain errors accurately and do not invent missing information.
-"""
+    ModuleNotFoundError: No module named 'pandas'
+    """
 
-response = generate_response(
-    prompt=prompt,
-    system_instruction=system_instruction
-)
+    response = generate_response(prompt=prompt)
 
-print("\nGEMINI API HANDLER TEST")
-print("=" * 50)
-print(response)
+    print("\nGemini Response:\n")
+    print(response)
+
+
+if __name__ == "__main__":
+    main()
