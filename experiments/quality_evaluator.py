@@ -336,3 +336,195 @@ def evaluate_runs(
             json.dump(payload, f, indent=2)
 
     return payload
+
+
+def calculate_precision_recall_f1(
+    y_true: list[str | None],
+    y_pred: list[str | None],
+    labels: list[str] | None = None,
+) -> dict:
+    """
+    Compute Accuracy, Precision, Recall, and Macro-F1 without external ML libraries.
+    Treats missing and null predictions honestly; reports exact sample size.
+    """
+    if not y_true or not y_pred:
+        return {
+            "accuracy": 0.0,
+            "macro_precision": 0.0,
+            "macro_recall": 0.0,
+            "macro_f1": 0.0,
+            "sample_size": 0,
+            "per_class": {},
+        }
+
+    sample_size = min(len(y_true), len(y_pred))
+    pairs = list(zip(y_true[:sample_size], y_pred[:sample_size]))
+
+    exact_matches = sum(
+        1
+        for yt, yp in pairs
+        if yt is not None and yp is not None and str(yt).lower().strip() == str(yp).lower().strip()
+    )
+    accuracy = round(exact_matches / sample_size, 4) if sample_size > 0 else 0.0
+
+    target_labels = labels or sorted({str(yt).lower().strip() for yt, _ in pairs if yt is not None})
+    per_class = {}
+    f1_list, prec_list, rec_list = [], [], []
+
+    for label in target_labels:
+        lbl = str(label).lower().strip()
+        tp = sum(
+            1
+            for yt, yp in pairs
+            if yt and yp and str(yt).lower().strip() == lbl and str(yp).lower().strip() == lbl
+        )
+        fp = sum(
+            1
+            for yt, yp in pairs
+            if (not yt or str(yt).lower().strip() != lbl) and yp and str(yp).lower().strip() == lbl
+        )
+        fn = sum(
+            1
+            for yt, yp in pairs
+            if yt and str(yt).lower().strip() == lbl and (not yp or str(yp).lower().strip() != lbl)
+        )
+
+        precision = round(tp / (tp + fp), 4) if (tp + fp) > 0 else 0.0
+        recall = round(tp / (tp + fn), 4) if (tp + fn) > 0 else 0.0
+        f1 = (
+            round(2 * (precision * recall) / (precision + recall), 4)
+            if (precision + recall) > 0
+            else 0.0
+        )
+
+        per_class[lbl] = {
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+        }
+        prec_list.append(precision)
+        rec_list.append(recall)
+        f1_list.append(f1)
+
+    macro_prec = round(sum(prec_list) / len(prec_list), 4) if prec_list else 0.0
+    macro_rec = round(sum(rec_list) / len(rec_list), 4) if rec_list else 0.0
+    macro_f1 = round(sum(f1_list) / len(f1_list), 4) if f1_list else 0.0
+
+    return {
+        "accuracy": accuracy,
+        "macro_precision": macro_prec,
+        "macro_recall": macro_rec,
+        "macro_f1": macro_f1,
+        "sample_size": sample_size,
+        "per_class": per_class,
+    }
+
+
+def evaluate_evidence_grounding(
+    report_or_dict,
+    raw_input_text: str,
+    known_evidence: list[str] | None = None,
+) -> dict:
+    """
+    Verify whether cited files, line numbers, and error excerpts actually
+    exist in the raw input. Detects and penalizes hallucinated / invented locations.
+    """
+    if not report_or_dict or not raw_input_text:
+        return {
+            "grounding_score": 1.0,
+            "file_grounded": None,
+            "line_grounded": None,
+            "invented_locations": [],
+            "evidence_recall": 0.0,
+        }
+
+    raw_lower = raw_input_text.lower()
+    invented_locations = []
+    file_grounded = None
+    line_grounded = None
+
+    if hasattr(report_or_dict, "error_information"):
+        err_info = report_or_dict.error_information
+        filename = getattr(err_info, "filename", None)
+        line_num = getattr(err_info, "line_number", None)
+    elif isinstance(report_or_dict, dict):
+        err_info = report_or_dict.get("error_information", {})
+        filename = err_info.get("filename")
+        line_num = err_info.get("line_number")
+    else:
+        filename, line_num = None, None
+
+    if filename:
+        fn_clean = str(filename).strip()
+        fn_base = Path(fn_clean).name.lower()
+        if fn_clean.lower() in raw_lower or fn_base in raw_lower:
+            file_grounded = True
+        else:
+            file_grounded = False
+            invented_locations.append(f"filename:{filename}")
+
+    if line_num is not None:
+        if str(line_num) in raw_input_text:
+            line_grounded = True
+        else:
+            line_grounded = False
+            invented_locations.append(f"line:{line_num}")
+
+    recall = 0.0
+    if known_evidence:
+        rep_text = str(report_or_dict).lower()
+        matched = sum(1 for token in known_evidence if token.lower() in rep_text)
+        recall = round(matched / len(known_evidence), 4)
+
+    if invented_locations:
+        score = 2.0
+    elif file_grounded is True and (line_grounded is True or line_grounded is None):
+        score = 5.0
+    elif file_grounded is True or line_grounded is True:
+        score = 4.0
+    elif file_grounded is None and line_grounded is None:
+        score = 3.5
+    else:
+        score = 2.5
+
+    return {
+        "grounding_score": score,
+        "file_grounded": file_grounded,
+        "line_grounded": line_grounded,
+        "invented_locations": invented_locations,
+        "evidence_recall": recall,
+    }
+
+
+def evaluate_schema_validity(report_obj) -> dict:
+    """
+    Check whether an output conforms to the Phase 6 DebuggingReport Pydantic schema.
+    """
+    from pydantic import ValidationError
+
+    from app.llm.exceptions import StructuredReportError
+    from app.schemas.debugging_report import DebuggingReport
+
+    if isinstance(report_obj, DebuggingReport):
+        return {"is_schema_valid": True, "error": None}
+
+    if isinstance(report_obj, dict):
+        try:
+            DebuggingReport.model_validate(report_obj)
+            return {"is_schema_valid": True, "error": None}
+        except (ValidationError, ValueError, TypeError) as err:
+            return {"is_schema_valid": False, "error": str(err)}
+
+    if isinstance(report_obj, str):
+        from app.schemas.debugging_report import parse_structured_debugging_report
+
+        try:
+            parse_structured_debugging_report(report_obj)
+            return {"is_schema_valid": True, "error": None}
+        except (StructuredReportError, ValidationError, ValueError, TypeError) as err:
+            return {"is_schema_valid": False, "error": str(err)}
+
+    return {"is_schema_valid": False, "error": "Unknown object type"}
