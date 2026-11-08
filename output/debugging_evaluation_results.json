@@ -1,0 +1,228 @@
+{
+  "run_id": "eval-run-20261107-121522",
+  "timestamp": "2026-11-07T12:15:22.284496+00:00",
+  "benchmark_version": "v1.0-standardized",
+  "benchmark_size": 1,
+  "models_evaluated": [
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash"
+  ],
+  "model_results": {
+    "gemini-3.5-flash-lite": {
+      "model_name": "gemini-3.5-flash-lite",
+      "metrics": {
+        "sample_size": 1,
+        "schema_validation_rate": 1.0,
+        "type_accuracy": 1.0,
+        "category_metrics": {
+          "accuracy": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0,
+          "sample_size": 1,
+          "per_class": {
+            "runtime": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          }
+        },
+        "severity_metrics": {
+          "accuracy": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0,
+          "sample_size": 1,
+          "per_class": {
+            "medium": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          }
+        },
+        "evidence_grounding_mean": 5.0,
+        "invented_locations_rate": 0.0,
+        "unsupported_claims_rate": 0.0,
+        "latency_stats": {
+          "sample_size": 1,
+          "mean_seconds": 0.85,
+          "median_seconds": 0.85,
+          "min_seconds": 0.85,
+          "max_seconds": 0.85
+        },
+        "token_stats": {
+          "total_prompt_tokens": 120,
+          "total_response_tokens": 80,
+          "total_tokens": 200,
+          "avg_prompt_tokens": 120,
+          "avg_response_tokens": 80
+        }
+      },
+      "cost_estimate": {
+        "pricing_available": true,
+        "pricing_source": "Google AI Studio Developer Pay-as-you-go reference tier",
+        "effective_date": "2025-11-01",
+        "estimated_prompt_cost_usd": 9e-06,
+        "estimated_response_cost_usd": 2.4e-05,
+        "estimated_total_cost_usd": 3.3e-05,
+        "disclaimer": "Estimated based on token usage; excludes taxes, tier limits, or free-quota discounts."
+      },
+      "case_evaluations": [
+        {
+          "case_id": "CASE-PY-01",
+          "title": "Python Type Mismatch",
+          "is_schema_valid": true,
+          "schema_error": null,
+          "predictions": {
+            "error_type": "TypeError",
+            "category": "runtime",
+            "severity": "medium",
+            "programming_language": "Python"
+          },
+          "ground_truth": {
+            "expected_classification": "TypeError",
+            "expected_category": "runtime",
+            "expected_severity": "medium",
+            "expected_language": "Python"
+          },
+          "classification_matches": {
+            "type_match": true,
+            "category_match": true,
+            "severity_match": true,
+            "language_match": true
+          },
+          "evidence_grounding": {
+            "grounding_score": 5.0,
+            "file_grounded": true,
+            "line_grounded": true,
+            "invented_locations": [],
+            "evidence_recall": 1.0
+          },
+          "root_cause_grounded": true,
+          "has_unsupported_claims": false,
+          "latency_seconds": 0.85,
+          "usage": {
+            "prompt_tokens": 120,
+            "response_tokens": 80
+          }
+        }
+      ]
+    },
+    "gemini-3.5-flash": {
+      "model_name": "gemini-3.5-flash",
+      "metrics": {
+        "sample_size": 1,
+        "schema_validation_rate": 1.0,
+        "type_accuracy": 1.0,
+        "category_metrics": {
+          "accuracy": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0,
+          "sample_size": 1,
+          "per_class": {
+            "runtime": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          }
+        },
+        "severity_metrics": {
+          "accuracy": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0,
+          "sample_size": 1,
+          "per_class": {
+            "medium": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          }
+        },
+        "evidence_grounding_mean": 5.0,
+        "invented_locations_rate": 0.0,
+        "unsupported_claims_rate": 0.0,
+        "latency_stats": {
+          "sample_size": 1,
+          "mean_seconds": 1.45,
+          "median_seconds": 1.45,
+          "min_seconds": 1.45,
+          "max_seconds": 1.45
+        },
+        "token_stats": {
+          "total_prompt_tokens": 120,
+          "total_response_tokens": 90,
+          "total_tokens": 210,
+          "avg_prompt_tokens": 120,
+          "avg_response_tokens": 90
+        }
+      },
+      "cost_estimate": {
+        "pricing_available": true,
+        "pricing_source": "Google AI Studio Developer Pay-as-you-go reference tier",
+        "effective_date": "2025-11-01",
+        "estimated_prompt_cost_usd": 1.8e-05,
+        "estimated_response_cost_usd": 5.4e-05,
+        "estimated_total_cost_usd": 7.2e-05,
+        "disclaimer": "Estimated based on token usage; excludes taxes, tier limits, or free-quota discounts."
+      },
+      "case_evaluations": [
+        {
+          "case_id": "CASE-PY-01",
+          "title": "Python Type Mismatch",
+          "is_schema_valid": true,
+          "schema_error": null,
+          "predictions": {
+            "error_type": "TypeError",
+            "category": "runtime",
+            "severity": "medium",
+            "programming_language": "Python"
+          },
+          "ground_truth": {
+            "expected_classification": "TypeError",
+            "expected_category": "runtime",
+            "expected_severity": "medium",
+            "expected_language": "Python"
+          },
+          "classification_matches": {
+            "type_match": true,
+            "category_match": true,
+            "severity_match": true,
+            "language_match": true
+          },
+          "evidence_grounding": {
+            "grounding_score": 5.0,
+            "file_grounded": true,
+            "line_grounded": true,
+            "invented_locations": [],
+            "evidence_recall": 1.0
+          },
+          "root_cause_grounded": true,
+          "has_unsupported_claims": false,
+          "latency_seconds": 1.45,
+          "usage": {
+            "prompt_tokens": 120,
+            "response_tokens": 90
+          }
+        }
+      ]
+    }
+  }
+}
