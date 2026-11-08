@@ -8,6 +8,8 @@ def create_generation_config(
     top_p: float = 0.9,
     max_output_tokens: int = 2048,
     top_k: int | None = None,
+    response_mime_type: str | None = None,
+    response_schema: type | None = None,
 ) -> types.GenerateContentConfig:
 
     if not 0.0 <= temperature <= 2.0:
@@ -28,4 +30,6 @@ def create_generation_config(
         top_p=top_p,
         top_k=top_k,
         max_output_tokens=max_output_tokens,
+        response_mime_type=response_mime_type,
+        response_schema=response_schema,
     )
