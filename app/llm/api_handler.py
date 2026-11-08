@@ -1,6 +1,8 @@
 
 import os
 import time
+import uuid
+from datetime import UTC
 
 from dotenv import load_dotenv
 from google.genai import errors
@@ -14,6 +16,7 @@ from app.llm.exceptions import (
     APIResourceNotFoundError,
     APIResponseTruncatedError,
     APIServiceError,
+    APITimeoutError,
     TracePilotAPIError,
 )
 from app.llm.logger import get_logger
@@ -32,11 +35,23 @@ logger = get_logger("TracePilot.API")
 def classify_api_error(error: Exception) -> TracePilotAPIError:
     """Convert Gemini SDK errors into TracePilot exceptions."""
 
+    if isinstance(error, TimeoutError):
+        return APITimeoutError("Gemini API request timed out.")
+
+    err_msg = str(error).lower()
+    if "deadline exceeded" in err_msg or "timed out" in err_msg or "timeout" in err_msg:
+        return APITimeoutError("Gemini API request timed out.")
+
     if isinstance(error, errors.ClientError):
         status_code = getattr(error, "code", None)
         message = str(error).lower()
 
-        if status_code in (401, 403):
+        if (
+            status_code in (401, 403)
+            or "api_key_invalid" in message
+            or "api key not valid" in message
+            or "api key invalid" in message
+        ):
             return APIAuthenticationError(
                 "Gemini authentication or permission failed."
             )
@@ -94,7 +109,7 @@ def _generate_with_classification(client, model, prompt, config):
             config=config,
         )
 
-    except errors.APIError as error:
+    except (errors.APIError, TimeoutError) as error:
         raise classify_api_error(error) from error
 
 
@@ -160,6 +175,8 @@ def generate_response(
     temperature: float = 0.2,
     top_p: float = 0.9,
     max_output_tokens: int = 2048,
+    response_mime_type: str | None = None,
+    response_schema: type | None = None,
 ) -> str:
     """Generate a response using primary and fallback Gemini models."""
 
@@ -180,6 +197,7 @@ def generate_response(
         fallback_model = None
 
     client = create_gemini_client()
+    request_id = f"req-{uuid.uuid4().hex[:8]}"
 
     config = create_generation_config(
         system_instruction=system_instruction,
@@ -187,9 +205,11 @@ def generate_response(
         top_p=top_p,
         max_output_tokens=max_output_tokens,
         top_k=top_k,
+        response_mime_type=response_mime_type,
+        response_schema=response_schema,
     )
 
-    logger.info("Using primary Gemini model: %s", primary_model)
+    logger.info("[%s] Using primary Gemini model: %s", request_id, primary_model)
 
     try:
         response_text = _generate_validated_response(
@@ -199,7 +219,7 @@ def generate_response(
             config,
         )
 
-        logger.info("Primary model succeeded: %s", primary_model)
+        logger.info("[%s] Primary model succeeded: %s", request_id, primary_model)
 
         return response_text
 
@@ -208,17 +228,22 @@ def generate_response(
         APIRateLimitError,
         APIServiceError,
         APIResponseTruncatedError,
-    ):
+        APITimeoutError,
+    ) as primary_error:
 
         if not fallback_model:
             logger.exception(
-                "Primary model failed and no fallback is configured."
+                "[%s] Primary model failed (%s) and no fallback is configured.",
+                request_id,
+                type(primary_error).__name__,
             )
             raise
 
         logger.warning(
-            "Primary model failed with an eligible error. "
-            "Switching to fallback model: %s",
+            "[%s] Primary model (%s) failed with %s. Switching to fallback model: %s",
+            request_id,
+            primary_model,
+            type(primary_error).__name__,
             fallback_model,
         )
 
@@ -231,18 +256,146 @@ def generate_response(
             )
 
             logger.info(
-                "Fallback model succeeded: %s",
+                "[%s] Fallback model succeeded: %s",
+                request_id,
                 fallback_model,
             )
 
             return response_text
 
         except TracePilotAPIError as fallback_error:
-            logger.exception("Fallback model also failed.")
+            logger.exception("[%s] Fallback model also failed.", request_id)
 
             raise TracePilotAPIError(
                 "Both primary and fallback Gemini models failed."
             ) from fallback_error
+
+
+def generate_response_with_metrics(
+    prompt: str,
+    top_k: int | None = None,
+    system_instruction: str | None = None,
+    temperature: float = 0.2,
+    top_p: float = 0.9,
+    max_output_tokens: int = 2048,
+    response_mime_type: str | None = None,
+    response_schema: type | None = None,
+):
+    """
+    Generate a response and capture complete usage telemetry and cost metrics.
+    """
+    from datetime import datetime
+
+    from app.llm.streaming import RequestUsageMetrics
+    from experiments.cost_analyzer import calculate_request_cost
+
+    primary_model = os.getenv("GEMINI_MODEL")
+    fallback_model = os.getenv("GEMINI_MODEL_FALLBACK")
+
+    if not primary_model:
+        raise ValueError("GEMINI_MODEL is missing from environment.")
+
+    if not prompt or not prompt.strip():
+        raise ValueError("Prompt cannot be empty.")
+
+    if fallback_model == primary_model:
+        fallback_model = None
+
+    client = create_gemini_client()
+    request_id = f"req-{uuid.uuid4().hex[:8]}"
+    start_iso = datetime.now(UTC).isoformat()
+    start_perf = time.perf_counter()
+
+    config = create_generation_config(
+        system_instruction=system_instruction,
+        temperature=temperature,
+        top_p=top_p,
+        max_output_tokens=max_output_tokens,
+        top_k=top_k,
+        response_mime_type=response_mime_type,
+        response_schema=response_schema,
+    )
+
+    active_model = primary_model
+    fallback_used = False
+    fallback_duration = None
+    meta = {}
+
+    try:
+        response = _request_model(client, primary_model, prompt, config)
+        meta = extract_response_metadata(response)
+        if meta.get("was_truncated"):
+            raise APIResponseTruncatedError(
+                f"Model {primary_model} output was truncated because it reached maximum token limit."
+            )
+        response_text = extract_response_text(response)
+    except (
+        APIQuotaExceededError,
+        APIRateLimitError,
+        APIServiceError,
+        APIResponseTruncatedError,
+        APITimeoutError,
+    ) as primary_error:
+        if not fallback_model:
+            raise
+
+        logger.warning(
+            "[%s] Primary model (%s) failed with %s. Switching to fallback model: %s",
+            request_id,
+            primary_model,
+            type(primary_error).__name__,
+            fallback_model,
+        )
+        fallback_start = time.perf_counter()
+        active_model = fallback_model
+        fallback_used = True
+
+        try:
+            response = _request_model(client, fallback_model, prompt, config)
+            meta = extract_response_metadata(response)
+            if meta.get("was_truncated"):
+                raise APIResponseTruncatedError(
+                    f"Model {fallback_model} output was truncated because it reached maximum token limit."
+                )
+            response_text = extract_response_text(response)
+            fallback_duration = round(time.perf_counter() - fallback_start, 4)
+        except TracePilotAPIError as fallback_error:
+            raise TracePilotAPIError(
+                "Both primary and fallback Gemini models failed."
+            ) from fallback_error
+
+    end_perf = time.perf_counter()
+    end_iso = datetime.now(UTC).isoformat()
+    total_duration = round(end_perf - start_perf, 4)
+
+    prompt_tok = meta.get("prompt_tokens")
+    resp_tok = meta.get("response_tokens")
+    cost_info = None
+    if prompt_tok is not None or resp_tok is not None:
+        cost_info = calculate_request_cost(active_model, prompt_tok, resp_tok)
+
+    metrics = RequestUsageMetrics(
+        request_id=request_id,
+        model_used=active_model,
+        fallback_used=fallback_used,
+        streaming=False,
+        start_time=start_iso,
+        completion_time=end_iso,
+        total_duration_seconds=total_duration,
+        time_to_first_chunk_seconds=None,
+        streaming_duration_seconds=None,
+        fallback_duration_seconds=fallback_duration,
+        prompt_tokens=prompt_tok,
+        response_tokens=resp_tok,
+        total_tokens=meta.get("total_tokens"),
+        finish_reason=meta.get("finish_reason"),
+        is_complete=meta.get("is_complete", False),
+        was_truncated=meta.get("was_truncated", False),
+        error_category=None,
+        cost_estimate=cost_info,
+    )
+
+    return response_text, metrics
 
 
 def execute_single_model(
@@ -253,6 +406,8 @@ def execute_single_model(
     top_p: float = 0.9,
     max_output_tokens: int = 2048,
     top_k: int | None = None,
+    response_mime_type: str | None = None,
+    response_schema: type | None = None,
     raise_on_error: bool = False,
 ) -> dict:
     """
@@ -276,6 +431,8 @@ def execute_single_model(
         top_p=top_p,
         max_output_tokens=max_output_tokens,
         top_k=top_k,
+        response_mime_type=response_mime_type,
+        response_schema=response_schema,
     )
 
     logger.info("Executing independent model request for: %s", model)
