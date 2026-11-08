@@ -23,9 +23,27 @@ class APIServiceError(TracePilotAPIError):
     """Gemini service or server error."""
 
 
+class APITimeoutError(TracePilotAPIError):
+    """Gemini API request timed out."""
+
+
+
 class APIRequestError(TracePilotAPIError):
     """Invalid API request."""
 
 
 class APIResponseTruncatedError(TracePilotAPIError):
     """The model stopped because it reached the output token limit."""
+
+
+class StructuredReportError(TracePilotAPIError):
+    """Base exception for structured debugging report failures."""
+
+
+class ReportParsingError(StructuredReportError):
+    """Failed to parse model response into JSON or extract expected structure."""
+
+
+class ReportValidationError(StructuredReportError):
+    """Model output failed Pydantic schema validation."""
+
