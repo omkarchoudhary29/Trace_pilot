@@ -1,6 +1,6 @@
 # TracePilot — Phase 5 Model Experiment Lab Consolidated Report
 
-**Generated:** 2026-11-07 07:02:14 UTC  
+**Generated:** 2026-11-07 12:05:32 UTC  
 **Evaluation Scope:** Phases 5.1 through 5.8  
 **Models Evaluated:** `gemini-3.5-flash-lite` (Primary), `gemini-3.5-flash` (Fallback)
 
