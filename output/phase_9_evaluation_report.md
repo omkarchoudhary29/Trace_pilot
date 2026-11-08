@@ -1,7 +1,7 @@
 # TracePilot — Phase 9: Debugging Evaluation Engine Report
 
-**Run ID:** `eval-run-20261107-121522`  
-**Generated:** 2026-11-07T12:15:22.284496+00:00  
+**Run ID:** `eval-run-20261108-054800`  
+**Generated:** 2026-11-08T05:48:00.508913+00:00  
 **Benchmark Version:** v1.0-standardized  
 **Total Benchmark Cases:** 1  
 **Models Evaluated:** `gemini-3.5-flash-lite`, `gemini-3.5-flash`
